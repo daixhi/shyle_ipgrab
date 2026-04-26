@@ -171,7 +171,7 @@ export default function App() {
           <div className="lg:col-span-5 flex flex-col h-full">
             <div className="pb-8 border-b border-gray-100 space-y-3">
               <h1 className="text-2xl md:text-3xl font-serif font-light text-stone-900 leading-tight">
-                Tattva Chitai Carved Statement Ankle Kada
+                Tattva Chitai Carved Statement Anklet
               </h1>
               
               <div className="pt-4 flex items-end gap-4">
@@ -237,7 +237,7 @@ export default function App() {
             {/* Restored Product Info */}
             <div className="py-8 border-t border-gray-100 space-y-6">
               <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-stone-900">The Inspiration</h3>
-              <p className="text-sm text-stone-500 leading-relaxed font-serif">A beautiful statement ankle kada featuring intricate traditional Chitai carving work. This bold, handcrafted piece seamlessly blends heritage design with modern elegance.</p>
+              <p className="text-sm text-stone-500 leading-relaxed font-serif">A beautiful statement anklet featuring intricate traditional Chitai carving work. This bold, handcrafted piece seamlessly blends heritage design with modern elegance.</p>
               <ul className="text-[13px] text-stone-600 space-y-2 list-none font-serif">
                 <li className="flex gap-3"><span className="text-brand-maroon">•</span> Premium quality pure 925 silver</li>
                 <li className="flex gap-3"><span className="text-brand-maroon">•</span> Traditional handcrafted Chitai carving</li>
